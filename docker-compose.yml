@@ -1,0 +1,108 @@
+version: '3.10'
+
+services:
+  nexus-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexus_quantum_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    ports:
+      - "8080:80"
+    depends_on:
+      nexus-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nexus-net
+
+  nexus-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus_backend_api
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://nexus:nexus@postgres:5432/nexus
+      ALEMBIC_SCRIPT_LOCATION: app/db/migrations
+      REDIS_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENABLE_DOCS: "true"
+      UPLOADS_DIR: /app/storage/uploads
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen(\\\"http://localhost:8000/api/v1/health/live\\\")\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nexus-net
+
+  nexus-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus_backend_worker
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://nexus:nexus@postgres:5432/nexus
+      REDIS_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      UPLOADS_DIR: /app/storage/uploads
+    command: ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info", "-Q", "audit_default"]
+    volumes:
+      - ./backend/storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - nexus-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus_postgres
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus
+      POSTGRES_DB: nexus
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nexus-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexus_redis
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - nexus-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  nexus-net:
+    driver: bridge

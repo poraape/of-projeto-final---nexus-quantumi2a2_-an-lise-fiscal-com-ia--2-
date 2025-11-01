@@ -1,0 +1,46 @@
+# .github/workflows/ci.yml
+
+name: Nexus Quantum - CI Pipeline
+
+# Aciona o workflow em pushes para o branch main e em pull requests para o main.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    # O tipo de máquina virtual para executar o job
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Define a versão do Node.js a ser usada
+        node-version: [20.x]
+
+    steps:
+      # 1. Faz o checkout do código do repositório
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Configura o ambiente Node.js com a versão especificada
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      # 3. Instala as dependências do projeto de forma limpa e consistente
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Executa os testes unitários
+      # O script 'test' deve estar definido em package.json (ex: "vitest")
+      - name: Run unit tests
+        run: npm test
+
+      # 5. Executa o build de produção para garantir que a aplicação compila sem erros
+      # O script 'build' deve estar definido em package.json (ex: "tsc && vite build")
+      - name: Build application
+        run: npm run build
