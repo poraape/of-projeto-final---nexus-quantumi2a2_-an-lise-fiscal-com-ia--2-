@@ -13,9 +13,6 @@ import LogsPanel from './components/LogsPanel';
 import DateRangeFilter from './components/DateRangeFilter';
 import IncrementalInsights from './components/IncrementalInsights';
 import CollapsibleSection from './components/CollapsibleSection';
-import BackendJobPanel from './components/backend/BackendJobPanel';
-import BackendJobResultCard from './components/backend/BackendJobResultCard';
-import { BackendPipelineProvider } from './context/BackendPipelineContext';
 import type { AuditReport } from './types';
 import dayjs from 'dayjs';
 
@@ -93,17 +90,13 @@ const App: React.FC = () => {
   
   return (
     <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
-      <BackendPipelineProvider>
-        <Header 
-          onShowLogs={() => setShowLogs(true)} 
-          onReset={resetApp} 
-          isAnalysisComplete={isPipelineComplete && !isPipelineRunning}
-        />
-      
+      <Header 
+        onShowLogs={() => setShowLogs(true)} 
+        onReset={resetApp} 
+        isAnalysisComplete={isPipelineComplete && !isPipelineRunning}
+      />
+    
       <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-        <BackendJobPanel />
-        <BackendJobResultCard />
-
         {!isPipelineComplete && !pipelineError && (
           <div className="max-w-4xl mx-auto">
             {isPipelineRunning ? (
@@ -154,9 +147,8 @@ const App: React.FC = () => {
 
       {error && <Toast message={error} onClose={() => setError(null)} />}
       {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
-    </BackendPipelineProvider>
-  </div>
-);
+    </div>
+  );
 };
 
 export default App;

@@ -1,7 +1,7 @@
 // services/apiClient.ts
 import type { ApiClientCallbacks, AuditReport, AuditedDocument } from '../types';
 import { initializeChat } from './chatService';
-import type { Chat } from '@google/genai';
+import type { Chat } from './geminiService';
 
 /**
  * Creates and manages the Web Worker instance.

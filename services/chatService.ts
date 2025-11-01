@@ -1,5 +1,6 @@
-import { Type, Chat } from "@google/genai";
+import { Type } from "@google/genai";
 import { createChatSession } from './geminiService';
+import type { Chat } from './geminiService';
 
 const chatResponseSchema = {
   type: Type.OBJECT,

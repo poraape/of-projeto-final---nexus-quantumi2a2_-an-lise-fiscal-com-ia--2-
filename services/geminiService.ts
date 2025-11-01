@@ -1,176 +1,193 @@
-import { GoogleGenAI, Chat, Type } from "@google/genai";
-// FIX: Corrected module import paths to be relative.
+import { Type } from "@google/genai";
 import { logger } from "./logger";
+import { apiClient } from "./apiClient";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+type ChatHistoryEntry = {
+    role: 'user' | 'model';
+    parts?: Array<{ text?: string }>;
+};
 
-// A type for the schema definition to avoid using `any`
+export type Chat = {
+    sendMessageStream: (input: { message: string }) => AsyncIterable<{ text: string }>;
+};
+
 export type ResponseSchema = {
     type: Type;
-    properties?: Record<string, any>;
-    items?: Record<string, any>;
+    properties?: Record<string, unknown>;
+    items?: Record<string, unknown>;
     required?: string[];
     description?: string;
     enum?: string[];
     nullable?: boolean;
-}
+};
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const schemaReplacer = (_key: string, value: unknown) => {
+    if (typeof value === 'symbol') {
+        return value.toString();
+    }
+    return value;
+};
 
-/**
- * Generates content from the Gemini model with a specified JSON schema for the response.
- * Includes retry logic with exponential backoff for rate limiting errors.
- * @param model The Gemini model to use (e.g., 'gemini-2.5-flash').
- * @param prompt The user prompt.
- * @param schema The JSON schema for the expected response.
- * @returns A promise that resolves to the parsed JSON object.
- */
-export async function generateJSON<T = any>(
+const buildHistoryText = (history: ChatHistoryEntry[]) =>
+    history
+        .map(entry => {
+            const roleLabel = entry.role === 'user' ? 'Usuario' : 'Assistente';
+            const textContent = entry.parts?.map(part => part?.text ?? '').join(' ') ?? '';
+            return `${roleLabel}: ${textContent}`.trim();
+        })
+        .filter(Boolean)
+        .join('\n');
+
+export async function generateJSON<T = unknown>(
     model: string,
     prompt: string,
     schema: ResponseSchema,
     maxRetries = 3
 ): Promise<T> {
     let attempt = 0;
-    while(attempt <= maxRetries) {
+    const schemaDescription = JSON.stringify(schema, schemaReplacer, 2);
+
+    while (attempt <= maxRetries) {
         try {
-            const response = await ai.models.generateContent({
-                model: model,
-                contents: prompt,
-                config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: schema as any, // Cast to any to satisfy the SDK's broader type
-                },
+            const composedPrompt = `${prompt}\n\nResponda apenas com um JSON valido que respeite o schema abaixo:\n${schemaDescription}`;
+
+            const { data } = await apiClient.post("/ai/generate", {
+                prompt: composedPrompt,
+                model,
+                temperature: 0.3,
             });
-            
-            const text = response.text;
-            if (!text) {
-                 throw new Error("A IA retornou uma resposta vazia.");
+
+            const text = typeof data?.text === 'string' ? data.text : '';
+            if (!text.trim()) {
+                throw new Error('Resposta vazia da IA.');
             }
-            
-            // Clean up potential markdown wrappers from the response text
-            const cleanedText = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+
+            const cleanedText = text.trim().replace(/^```json\s*/i, '').replace(/```$/i, '');
             return JSON.parse(cleanedText) as T;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.log('geminiService', 'WARN', `Tentativa ${attempt + 1} de gerar JSON falhou.`, { error: message });
 
-        } catch (e) {
-            const errorString = e instanceof Error ? e.message : String(e);
-            logger.log('geminiService', 'WARN', `Tentativa ${attempt + 1} de geração de JSON falhou.`, { error: errorString });
-            
-            const isRateLimitError = errorString.includes('429') || 
-                                     errorString.toLowerCase().includes('quota') || 
-                                     errorString.toLowerCase().includes('resource has been exhausted');
+            const normalized = message.toLowerCase();
+            const isRateLimit = normalized.includes('429') || normalized.includes('quota') || normalized.includes('exhaust');
 
-            if (isRateLimitError && attempt < maxRetries) {
+            if (isRateLimit && attempt < maxRetries) {
                 const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
                 logger.log('geminiService', 'INFO', `Limite de taxa atingido. Tentando novamente em ${Math.round(delay / 1000)}s.`);
                 await sleep(delay);
                 attempt++;
-            } else if (isRateLimitError) {
-                logger.log('geminiService', 'ERROR', `Máximo de tentativas de limite de taxa atingido.`);
-                throw new Error('Cota da API excedida. Por favor, tente novamente mais tarde.');
-            } else {
-                 logger.log('geminiService', 'ERROR', `Falha na geração de JSON com o modelo ${model}.`, { error: e });
-                 if (e instanceof SyntaxError) {
-                     // Pass the malformed text in the error for better debugging
-                     throw new SyntaxError(`A resposta da IA não era um JSON válido: ${e.message}`);
-                 }
-                 throw new Error('Ocorreu um erro na comunicação com a IA.');
+                continue;
             }
+
+            if (error instanceof SyntaxError) {
+                throw new SyntaxError(`Resposta nao era JSON valido: ${error.message}`);
+            }
+
+            throw new Error('Falha na comunicacao com o servico de IA.');
         }
     }
-    // This line should be unreachable if the logic is correct.
-    throw new Error('Falha na geração de JSON após múltiplas tentativas.');
+
+    throw new Error('Falha ao gerar JSON apos multiplas tentativas.');
 }
 
-
-/**
- * Creates a new chat session with a system instruction and a JSON schema for responses.
- * @param model The Gemini model to use.
- * @param systemInstruction The system-level instructions for the chat bot.
- * @param schema The JSON schema for all chat responses.
- * @param history Optional initial chat history.
- * @returns A Chat instance.
- */
 export function createChatSession(
     model: string,
     systemInstruction: string,
     schema: ResponseSchema,
     history?: any[]
 ): Chat {
-    return ai.chats.create({
-        model,
-        history,
-        config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-            responseSchema: schema as any, // Cast to any to satisfy the SDK's broader type
+    const chatHistory: ChatHistoryEntry[] = Array.isArray(history) ? [...history] : [];
+    const schemaDescription = JSON.stringify(schema, schemaReplacer, 2);
+
+    return {
+        async *sendMessageStream({ message }: { message: string }) {
+            chatHistory.push({ role: 'user', parts: [{ text: message }] });
+
+            const historyText = buildHistoryText(chatHistory) || 'Sem historico anterior.';
+            const promptSections = [
+                'Instrucoes do sistema:',
+                systemInstruction,
+                '',
+                'Schema esperado (JSON):',
+                schemaDescription,
+                '',
+                'Historico da conversa:',
+                historyText,
+                '',
+                'Usuario:',
+                message,
+                '',
+                'Retorne apenas um JSON valido que siga o schema.',
+            ];
+
+            const { data } = await apiClient.post("/ai/generate", {
+                prompt: promptSections.join('\n'),
+                model,
+                temperature: 0.3,
+            });
+
+            const text = typeof data?.text === 'string' ? data.text : '';
+            chatHistory.push({ role: 'model', parts: [{ text }] });
+
+            yield { text };
         },
-    });
+    };
 }
 
-/**
- * Sends a message in a chat and streams the response.
- * @param chat The Chat instance.
- * @param message The user's message.
- * @returns An async generator that yields text chunks of the response.
- */
 export async function* streamChatMessage(chat: Chat, message: string): AsyncGenerator<string> {
     if (!chat) {
-        throw new Error('Chat not initialized.');
+        throw new Error('Chat nao inicializado.');
     }
+
+    const stream = chat.sendMessageStream({ message });
 
     try {
-        const stream = await chat.sendMessageStream({ message });
         for await (const chunk of stream) {
-            yield chunk.text;
+            const chunkText = typeof chunk === 'string' ? chunk : chunk?.text ?? '';
+            if (chunkText) {
+                yield chunkText;
+            }
         }
-    } catch (e) {
-        logger.log('geminiService', 'ERROR', 'Falha durante o streaming da resposta do chat.', { error: e });
-        console.error('Error during streaming chat:', e);
-        throw new Error('Desculpe, ocorreu um erro ao processar sua solicitação de chat.');
+    } catch (error) {
+        logger.log('geminiService', 'ERROR', 'Falha durante o streaming da resposta do chat.', { error });
+        throw new Error('Erro ao processar a resposta do chat.');
     }
 }
-
 
 const suggestionSchema = {
     type: Type.OBJECT,
     properties: {
         questions: {
             type: Type.ARRAY,
-            description: "Um array de 3-4 perguntas sugeridas.",
-            items: { type: Type.STRING }
-        }
+            description: 'Array de 3-4 perguntas sugeridas.',
+            items: { type: Type.STRING },
+        },
     },
-    required: ['questions']
+    required: ['questions'],
 };
 
-
 export async function generateSuggestedQuestions(
-    conversationHistory: { sender: string, text: string }[],
+    conversationHistory: { sender: string; text: string }[],
     reportSummary: any
 ): Promise<string[]> {
     const historyText = conversationHistory
-        .map(m => `${m.sender === 'user' ? 'Usuário' : 'IA'}: ${m.text}`)
+        .map(m => `${m.sender === 'user' ? 'Usuario' : 'IA'}: ${m.text}`)
         .join('\n');
 
     const prompt = `
-        Você é um assistente de IA proativo que ajuda um analista fiscal.
-        Sua tarefa é gerar 3 ou 4 perguntas de acompanhamento curtas e perspicazes que o usuário poderia fazer a seguir, com base no resumo do relatório fiscal e nas últimas mensagens da conversa.
-        As perguntas devem incentivar uma exploração mais profunda dos dados ou da análise da IA.
-        Evite perguntas que já foram feitas. As perguntas devem ser concisas e diretas.
+        Voce e um assistente fiscal proativo.
+        Gere 3 ou 4 perguntas de acompanhamento curtas e objetivas com base no resumo do relatorio e nas ultimas mensagens.
+        Evite repetir perguntas ja feitas. Retorne apenas JSON valido seguindo o schema.
 
-        **Resumo do Relatório Fiscal:**
-        - Título: ${reportSummary.title}
-        - Principais Métricas: ${reportSummary.keyMetrics.map((m: any) => `${m.metric}: ${m.value}`).join(', ')}
-        - Principais Insights: ${reportSummary.actionableInsights.join('; ')}
+        Resumo do relatorio:
+        - Titulo: ${reportSummary.title}
+        - Principais metricas: ${reportSummary.keyMetrics.map((m: any) => `${m.metric}: ${m.value}`).join(', ')}
+        - Principais insights: ${reportSummary.actionableInsights.join('; ')}
 
-        **Últimas Mensagens da Conversa:**
+        Ultimas mensagens:
         ${historyText}
-
-        Baseado neste contexto, gere as próximas perguntas.
-        Retorne sua resposta como um objeto JSON com uma única chave "questions" contendo um array de strings.
-        Garanta que qualquer aspas duplas dentro das strings de perguntas sejam devidamente escapadas com uma barra invertida (ex: "Qual o valor do produto \\"X\\"?").
     `;
 
     try {
@@ -180,8 +197,9 @@ export async function generateSuggestedQuestions(
             suggestionSchema
         );
         return result.questions || [];
-    } catch (e) {
-        logger.log('geminiService', 'WARN', 'Falha ao gerar sugestões de perguntas. Retornando array vazio.', { error: e });
+    } catch (error) {
+        logger.log('geminiService', 'WARN', 'Falha ao gerar sugestoes de perguntas.', { error });
         return [];
     }
 }
+

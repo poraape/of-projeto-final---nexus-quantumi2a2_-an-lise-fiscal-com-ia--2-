@@ -30,8 +30,8 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       ENABLE_DOCS: "true"
       UPLOADS_DIR: /app/storage/uploads
-    ports:
-      - "8000:8000"
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+    # backend is internal; access via frontend nginx proxy on 8080
     volumes:
       - ./backend/storage:/app/storage
     depends_on:
@@ -60,7 +60,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       UPLOADS_DIR: /app/storage/uploads
-    command: ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info", "-Q", "audit_default"]
+      PYTHONPATH: /app
+    command: ["celery", "-A", "app.workers", "worker", "--loglevel=info", "-Q", "audit_default"]
     volumes:
       - ./backend/storage:/app/storage
     depends_on:

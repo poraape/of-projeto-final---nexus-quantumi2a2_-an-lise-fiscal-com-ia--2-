@@ -11,7 +11,7 @@ router = APIRouter(tags=["health"])
 
 
 @router.get(
-    "/health/live",
+    "/live",
     summary="Liveness probe",
     response_model=dict,
 )
@@ -23,7 +23,7 @@ async def liveness_probe() -> dict:
 
 
 @router.get(
-    "/health/ready",
+    "/ready",
     summary="Readiness probe",
     response_model=dict,
 )
