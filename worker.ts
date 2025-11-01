@@ -6,16 +6,14 @@ import { runDeterministicCrossValidation } from './utils/fiscalCompare';
 import { runAccountantAnalysis } from './agents/accountantAgent';
 import { runIntelligenceAnalysis } from './agents/intelligenceAgent';
 import { runReconciliation } from './agents/reconciliationAgent';
-import type { AgentStates, AuditReport, AuditedDocument, BankTransaction, ReconciliationResult } from './types';
 import { logger } from './services/logger';
 import Papa from 'papaparse';
 
-
-const postAgentUpdate = (states: Partial<AgentStates>) => {
+const postAgentUpdate = (states) => {
     self.postMessage({ type: 'AGENT_UPDATE', payload: states });
 };
 
-self.onmessage = async (event: MessageEvent) => {
+self.onmessage = async (event) => {
     const { type, payload } = event.data;
 
     if (type === 'START_PIPELINE') {
@@ -32,7 +30,7 @@ self.onmessage = async (event: MessageEvent) => {
             
             // 2. Auditor Agent
             postAgentUpdate({ auditor: { name: 'auditor', status: 'running' } });
-            let report: Omit<AuditReport, 'summary'> = await runAudit(importedDocs);
+            let report = await runAudit(importedDocs);
             postAgentUpdate({ auditor: { name: 'auditor', status: 'completed' } });
 
             // 3. Classifier Agent
@@ -58,7 +56,7 @@ self.onmessage = async (event: MessageEvent) => {
             // 6. Intelligence Agent (AI)
             postAgentUpdate({ intelligence: { name: 'intelligence', status: 'running' } });
             const aiResults = await runIntelligenceAnalysis(report);
-            const finalReport: AuditReport = { ...report, ...aiResults };
+            const finalReport = { ...report, ...aiResults };
             postAgentUpdate({ intelligence: { name: 'intelligence', status: 'completed' } });
 
             self.postMessage({ type: 'PIPELINE_RESULT', payload: finalReport });
@@ -75,12 +73,12 @@ self.onmessage = async (event: MessageEvent) => {
             postAgentUpdate({ reconciliation: { name: 'reconciliation', status: 'running' } });
 
             // This is a simplified bank statement parser for demo purposes.
-            const transactions: BankTransaction[] = [];
+            const transactions = [];
             for (const file of bankFiles) {
                 const text = await file.text();
                 // Simple CSV parsing, assuming columns: Date,Description,Amount
-                const parsed = Papa.parse<any>(text, { header: true, skipEmptyLines: true });
-                parsed.data.forEach((row: any, i: number) => {
+                const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+                parsed.data.forEach((row, i) => {
                     const amount = parseFloat(row.Amount || row.amount || row.Valor);
                     if(!isNaN(amount)) {
                          transactions.push({
@@ -95,7 +93,7 @@ self.onmessage = async (event: MessageEvent) => {
                 });
             }
             
-            const result: ReconciliationResult = await runReconciliation(documents, transactions);
+            const result = await runReconciliation(documents, transactions);
             
             postAgentUpdate({ reconciliation: { name: 'reconciliation', status: 'completed' } });
             self.postMessage({ type: 'RECONCILIATION_RESULT', payload: { reconciliationResult: result } });
