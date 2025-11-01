@@ -23,9 +23,8 @@ services:
       dockerfile: Dockerfile
     container_name: nexus_backend_api
     environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://nexus:nexus@postgres:5432/nexus
-      ALEMBIC_SCRIPT_LOCATION: app/db/migrations
       REDIS_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       ENABLE_DOCS: "true"
@@ -54,6 +53,7 @@ services:
       dockerfile: Dockerfile
     container_name: nexus_backend_worker
     environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://nexus:nexus@postgres:5432/nexus
       REDIS_URL: redis://redis:6379/0

@@ -1,6 +1,7 @@
 import { logger } from "./logger";
-import { apiClient } from "./apiClient";
 import { Type, SchemaType } from "./geminiSchema";
+import { AIError, ApiError } from '../utils/errors';
+import { AiService } from './generatedApi';
 
 type ChatHistoryEntry = {
     role: 'user' | 'model';
@@ -53,25 +54,27 @@ export async function generateJSON<T = unknown>(
         try {
             const composedPrompt = `${prompt}\n\nResponda apenas com um JSON valido que respeite o schema abaixo:\n${schemaDescription}`;
 
-            const { data } = await apiClient.post("/ai/generate", {
-                prompt: composedPrompt,
-                model,
-                temperature: 0.3,
+            const response = await AiService.generateApiV1AiGeneratePost({
+                requestBody: {
+                    prompt: composedPrompt,
+                    model,
+                    temperature: 0.3,
+                }
             });
 
-            const text = typeof data?.text === 'string' ? data.text : '';
-            if (!text.trim()) {
-                throw new Error('Resposta vazia da IA.');
+            const text = (response as any).text;
+
+            if (!text || !text.trim()) {
+                throw new AIError('Resposta vazia da IA.');
             }
 
             const cleanedText = text.trim().replace(/^```json\s*/i, '').replace(/```$/i, '');
             return JSON.parse(cleanedText) as T;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            logger.log('geminiService', 'WARN', `Tentativa ${attempt + 1} de gerar JSON falhou.`, { error: message });
+            logger.log('geminiService', 'WARN', `Tentativa ${attempt + 1} de gerar JSON falhou.`, { error });
 
-            const normalized = message.toLowerCase();
-            const isRateLimit = normalized.includes('429') || normalized.includes('quota') || normalized.includes('exhaust');
+            const isRateLimit = (error instanceof ApiError && error.statusCode === 429) || message.toLowerCase().includes('quota') || message.toLowerCase().includes('exhaust');
 
             if (isRateLimit && attempt < maxRetries) {
                 const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
@@ -82,14 +85,14 @@ export async function generateJSON<T = unknown>(
             }
 
             if (error instanceof SyntaxError) {
-                throw new SyntaxError(`Resposta nao era JSON valido: ${error.message}`);
+                throw new AIError(`Resposta nao era JSON valido: ${error.message}`, error);
             }
 
-            throw new Error('Falha na comunicacao com o servico de IA.');
+            throw new AIError('Falha na comunicacao com o servico de IA.', error);
         }
     }
 
-    throw new Error('Falha ao gerar JSON apos multiplas tentativas.');
+    throw new AIError('Falha ao gerar JSON apos multiplas tentativas.');
 }
 
 export function createChatSession(
@@ -122,13 +125,16 @@ export function createChatSession(
                 'Retorne apenas um JSON valido que siga o schema.',
             ];
 
-            const { data } = await apiClient.post("/ai/generate", {
-                prompt: promptSections.join('\n'),
-                model,
-                temperature: 0.3,
+            const response = await AiService.generateApiV1AiGeneratePost({
+                requestBody: {
+                    prompt: promptSections.join('\n'),
+                    model,
+                    temperature: 0.3,
+                }
             });
 
-            const text = typeof data?.text === 'string' ? data.text : '';
+            const text = (response as any).text;
+
             chatHistory.push({ role: 'model', parts: [{ text }] });
 
             yield { text };
