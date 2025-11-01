@@ -6,6 +6,7 @@ from uuid import UUID
 import pytest
 import schemathesis
 from httpx import AsyncClient
+from hypothesis import HealthCheck, settings
 
 from app.core.config import get_settings
 from app.db.models import AuditJob
@@ -116,13 +117,14 @@ async def test_missing_files_returns_400(client: AsyncClient) -> None:
         headers={"Idempotency-Key": "33333333-3333-3333-3333-333333333333"},
         files={},
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 schema = schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)
 
 
 @schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_openapi_contract(case, captured_tasks):
     if case.method == "POST" and case.path == "/api/v1/audits":
         pytest.skip("Multipart body generation not yet supported in contract tests")

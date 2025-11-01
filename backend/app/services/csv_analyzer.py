@@ -109,17 +109,22 @@ def analyse_csv_stream(stream: BinaryIO, *, filename: str | None = None) -> CSVA
             series = df[col]
 
             # Try direct conversion first
-            converted_series = pd.to_numeric(series, errors='coerce')
+            converted_series = pd.to_numeric(series, errors="coerce")
 
-            # If that fails, try cleaning for pt-BR currency
-            if converted_series.isnull().all():
+            # If that fails for some values, try cleaning for pt-BR currency
+            failed_mask = converted_series.isnull()
+            if failed_mask.any():
+                # Apply cleaning only to the values that failed conversion
                 cleaned_series = (
-                    series.str.replace("R$", "", regex=False)
-                    .str.strip()
+                    series[failed_mask]
+                    .str.replace(r"[^0-9,.]", "", regex=True)  # Remove non-numeric chars
                     .str.replace(".", "", regex=False)
                     .str.replace(",", ".", regex=False)
                 )
-                converted_series = pd.to_numeric(cleaned_series, errors='coerce')
+                converted_cleaned = pd.to_numeric(cleaned_series, errors="coerce")
+
+                # Update the original converted series with the newly converted values
+                converted_series[failed_mask] = converted_cleaned
 
             # If any conversion resulted in at least one number, update the column
             if not converted_series.isnull().all():
