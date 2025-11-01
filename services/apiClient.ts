@@ -8,8 +8,8 @@ import type { Chat } from './geminiService';
  * @returns A new Worker instance.
  */
 const createWorker = (): Worker => {
-    // This method is more robust for environments like AI Studio where origins can be complex.
-    const workerUrl = new URL('../worker.ts', window.location.origin);
+    // Resolves correctly in Vite build output (rewritten to /assets/worker-*.js)
+    const workerUrl = new URL('../worker.ts', import.meta.url);
     return new Worker(workerUrl, { type: 'module' });
 };
 

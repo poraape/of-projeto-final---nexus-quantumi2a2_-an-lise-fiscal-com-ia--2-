@@ -1,5 +1,5 @@
 // nlpAgent.ts
-import { Type } from "@google/genai";
+import { Type } from "../services/geminiSchema";
 // FIX: Corrected module import paths to be relative.
 import { logger } from "../services/logger";
 import { generateJSON } from "../services/geminiService";

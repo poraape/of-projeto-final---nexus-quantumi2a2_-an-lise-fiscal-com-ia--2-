@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Type } from "@google/genai";
+import { Type } from '../services/geminiSchema';
 import type { AuditReport, SmartSearchResult } from '../types';
 import Papa from 'papaparse';
 // FIX: Corrected module import paths to be relative.

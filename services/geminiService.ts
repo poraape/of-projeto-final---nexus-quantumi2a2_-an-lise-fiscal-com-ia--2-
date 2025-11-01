@@ -1,6 +1,6 @@
-import { Type } from "@google/genai";
 import { logger } from "./logger";
 import { apiClient } from "./apiClient";
+import { Type, SchemaType } from "./geminiSchema";
 
 type ChatHistoryEntry = {
     role: 'user' | 'model';
@@ -12,7 +12,7 @@ export type Chat = {
 };
 
 export type ResponseSchema = {
-    type: Type;
+    type: SchemaType;
     properties?: Record<string, unknown>;
     items?: Record<string, unknown>;
     required?: string[];
@@ -202,4 +202,3 @@ export async function generateSuggestedQuestions(
         return [];
     }
 }
-

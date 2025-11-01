@@ -1,5 +1,5 @@
 // agents/intelligenceAgent.ts
-import { Type } from "@google/genai";
+import { Type } from '../services/geminiSchema';
 import { generateJSON } from '../services/geminiService';
 import type { AuditReport, ExecutiveSummary, AIDrivenInsight, CrossValidationResult } from '../types';
 import { logger } from '../services/logger';

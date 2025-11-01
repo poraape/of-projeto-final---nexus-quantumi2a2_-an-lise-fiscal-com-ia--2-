@@ -1,4 +1,4 @@
-import { Type } from "@google/genai";
+import { Type } from './geminiSchema';
 import { createChatSession } from './geminiService';
 import type { Chat } from './geminiService';
 
