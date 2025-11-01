@@ -1,0 +1,4 @@
+# file: X:\PROJETO FINAL I2A2\of-projeto-final---nexus-quantumi2a2_-análise-fiscal-com-ia (2)\backend\app\api\v1\health.py
+# hypothesis_version: 6.142.5
+
+['/live', '/ready', 'Liveness probe', 'Readiness probe', 'celery', 'checks', 'database', 'health', 'ok', 'status']

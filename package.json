@@ -19,6 +19,7 @@
     "fast-xml-parser": "^4.4.0",
     "filesize": "^10.1.2",
     "html2canvas": "^1.4.1",
+    "jschardet": "^3.1.4",
     "jszip": "^3.10.1",
     "papaparse": "^5.4.1",
     "pdfjs-dist": "^4.8.69",

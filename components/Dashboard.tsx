@@ -1,5 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import type { AuditReport, AuditedDocument, AuditStatus, ClassificationResult, AIDrivenInsight, AIFindingSeverity, KeyMetric, ReconciliationStatus } from '../types';
+import type {
+  AuditReport,
+  AuditedDocument,
+  AuditStatus,
+  ClassificationResult,
+  AIDrivenInsight,
+  AIFindingSeverity,
+  KeyMetric,
+  ReconciliationStatus,
+  FileStructuralSummary,
+  StructuralQuality,
+} from '../types';
 // FIX: Corrected module import paths to be relative.
 import { 
     MetricIcon, 
@@ -49,6 +60,13 @@ const statusConfig: Record<KeyMetric['status'], { icon: React.FC<any>; iconClass
     UNAVAILABLE: { icon: FileInfoIcon, iconClass: 'text-gray-500', borderClass: 'border-l-gray-600', valueClass: 'text-gray-500' }
 };
 
+const structuralQualityStyles: Record<StructuralQuality, string> = {
+    EXCELLENT: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+    GOOD: 'bg-sky-500/15 text-sky-300 border border-sky-500/40',
+    FAIR: 'bg-amber-500/15 text-amber-200 border border-amber-500/40',
+    POOR: 'bg-rose-600/20 text-rose-200 border border-rose-500/40',
+};
+
 const INITIAL_DOC_COUNT = 50;
 const DOC_BATCH_SIZE = 50;
 
@@ -66,27 +84,195 @@ const KeyMetricDisplay: React.FC<{ item: KeyMetric }> = ({ item }) => {
     );
 };
 
+const issueStyles: Record<'INFO' | 'WARN' | 'ERROR', string> = {
+    INFO: 'bg-slate-700/50 text-slate-200 border border-slate-600/60',
+    WARN: 'bg-amber-500/15 text-amber-200 border border-amber-500/40',
+    ERROR: 'bg-rose-600/15 text-rose-200 border border-rose-500/40',
+};
+
+const StructuralDiagnostics: React.FC<{ report?: FileStructuralSummary }> = ({ report }) => {
+    if (!report) return null;
+
+    const topColumns = (report.columnProfiles ?? []).slice(0, 3);
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-white/5 bg-slate-900/60 p-4">
+                <h6 className="text-xs uppercase tracking-[0.2em] text-slate-400">Resumo Estrutural</h6>
+                <dl className="mt-3 space-y-2 text-xs text-slate-200">
+                    <div className="flex justify-between gap-3">
+                        <dt className="text-slate-400">Formato detectado</dt>
+                        <dd className="font-semibold text-slate-100">{report.format}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                        <dt className="text-slate-400">Encoding</dt>
+                        <dd>{report.encoding.normalized.toUpperCase()}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                        <dt className="text-slate-400">Linhas x Colunas</dt>
+                        <dd>{(report.rowCount ?? 0).toLocaleString()} × {report.columnCount ?? 0}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                        <dt className="text-slate-400">Idioma/Locale</dt>
+                        <dd>{report.language ?? '—'} {report.locale ? `· ${report.locale}` : ''}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                        <dt className="text-slate-400">Checksum</dt>
+                        <dd className="font-mono text-[10px] text-slate-400 truncate max-w-[12rem]" title={report.checksum}>{report.checksum}</dd>
+                    </div>
+                    {report.parentArchive && (
+                        <div className="flex justify-between gap-3">
+                            <dt className="text-slate-400">Origem</dt>
+                            <dd className="text-slate-300">{report.parentArchive}{report.internalPath ? ` › ${report.internalPath}` : ''}</dd>
+                        </div>
+                    )}
+                </dl>
+                {report.processingLog.length > 0 && (
+                    <div className="mt-4">
+                        <h6 className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.18em]">Pipeline</h6>
+                        <ul className="mt-2 space-y-1 text-[11px] text-slate-300">
+                            {report.processingLog.slice(0, 4).map((step, index) => (
+                                <li key={index} className="flex items-start gap-2">
+                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400/80"></span>
+                                    <span className="flex-1">{step}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-4">
+                <div className="rounded-xl border border-white/5 bg-slate-900/60 p-4">
+                    <h6 className="text-xs uppercase tracking-[0.2em] text-slate-400">Alertas Estruturais</h6>
+                    {report.issues.length === 0 ? (
+                        <p className="mt-3 text-xs text-emerald-200">Nenhum alerta relevante — estrutura validada.</p>
+                    ) : (
+                        <ul className="mt-3 space-y-2 text-[11px]">
+                            {report.issues.slice(0, 4).map((issue, index) => (
+                                <li key={index} className={`rounded-lg px-3 py-2 ${issueStyles[issue.severity]}`}>
+                                    <p className="font-semibold">{issue.message}</p>
+                                    {issue.hint && <p className="mt-1 text-[10px] text-slate-300">{issue.hint}</p>}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                {topColumns.length > 0 && (
+                    <div className="rounded-xl border border-white/5 bg-slate-900/60 p-4">
+                        <h6 className="text-xs uppercase tracking-[0.2em] text-slate-400">Perfis de Colunas</h6>
+                        <ul className="mt-3 space-y-2 text-[11px] text-slate-200">
+                            {topColumns.map((column) => (
+                                <li key={column.name} className="rounded-lg border border-white/5 bg-slate-800/60 px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="font-semibold text-slate-100">{column.name}</span>
+                                        <span className="text-[10px] uppercase tracking-wide text-sky-300">{column.semanticType}</span>
+                                    </div>
+                                    <p className="mt-1 text-[10px] text-slate-300">
+                                        Nulos: {Math.round(column.nullPercentage * 100)}% · Únicos: {column.uniqueValues}
+                                        {column.outlierRate !== undefined ? ` · Outliers: ${Math.round((column.outlierRate || 0) * 100)}%` : ''}
+                                    </p>
+                                    {column.notes && column.notes.length > 0 && (
+                                        <ul className="mt-1 space-y-1 text-[10px] text-amber-200">
+                                            {column.notes.slice(0, 2).map((note, idx) => (
+                                                <li key={idx}>• {note}</li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const DocumentItem: React.FC<{ item: AuditedDocument; onClassificationChange: Function; onCostCenterChange: Function; }> = ({ item, onClassificationChange, onCostCenterChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { doc, status, inconsistencies, classification, reconciliationStatus } = item;
+    const structuralReport = doc.meta?.structuralReport as FileStructuralSummary | undefined;
+    const qualityBadgeClass = structuralReport ? structuralQualityStyles[structuralReport.quality] : '';
+    const canExpand = Boolean(structuralReport) || inconsistencies.length > 0;
+
     return (
         <div className="bg-gray-700/50 rounded-lg">
-            <div className={`flex items-center p-3 ${inconsistencies.length > 0 ? 'cursor-pointer' : ''} flex-wrap sm:flex-nowrap gap-2`} onClick={() => inconsistencies.length > 0 && setIsExpanded(!isExpanded)}>
+            <div
+                className={`flex items-center p-3 flex-wrap sm:flex-nowrap gap-2 ${canExpand ? 'cursor-pointer' : ''}`}
+                onClick={() => canExpand && setIsExpanded((prev) => !prev)}
+            >
                 {statusStyles[status].icon}
                 <span className="truncate mx-3 flex-1 text-gray-300 text-sm order-1 sm:order-none w-full sm:w-auto">{doc.name}</span>
+                {structuralReport && (
+                    <span
+                        className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-1 rounded-full ${qualityBadgeClass}`}
+                    >
+                        {structuralReport.quality} · {structuralReport.format}
+                    </span>
+                )}
                 <div className="flex items-center gap-2 ml-auto order-2 sm:order-none">
-                    {reconciliationStatus && <span title={reconciliationStatusStyles[reconciliationStatus].title}>{reconciliationStatusStyles[reconciliationStatus].icon}</span>}
-                    {classification && (
-                         <select value={classification.operationType} onChange={(e) => { e.stopPropagation(); onClassificationChange(doc.name, e.target.value); }} onClick={(e) => e.stopPropagation()} className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap border-none appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${classificationStyles[classification.operationType]}`}>
-                            {classificationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                         </select>
+                    {reconciliationStatus && (
+                        <span title={reconciliationStatusStyles[reconciliationStatus].title}>
+                            {reconciliationStatusStyles[reconciliationStatus].icon}
+                        </span>
                     )}
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${statusStyles[status].badge}`}>{statusStyles[status].text}</span>
-                    {inconsistencies.length > 0 && <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />}
+                    {classification && (
+                        <select
+                            value={classification.operationType}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                onClassificationChange(doc.name, e.target.value);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap border-none appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${classificationStyles[classification.operationType]}`}
+                        >
+                            {classificationOptions.map((opt) => (
+                                <option key={opt} value={opt}>
+                                    {opt}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${statusStyles[status].badge}`}>
+                        {statusStyles[status].text}
+                    </span>
+                    {canExpand && (
+                        <ChevronDownIcon
+                            className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                    )}
                 </div>
             </div>
-            {isExpanded && inconsistencies.length > 0 && (
-                 <div className="border-t border-gray-600/50 p-4 animate-fade-in-down"><h5 className="font-semibold text-sm mb-2 text-gray-300">Inconsistências Encontradas:</h5><ul className="space-y-3">{inconsistencies.map((inc, index) => (<li key={index} className="text-xs border-l-2 border-yellow-500/50 pl-3"><p className="font-semibold text-yellow-300">{inc.message} <span className="text-gray-500 font-mono">({inc.code})</span></p><p className="text-gray-400 mt-1"><span className="font-semibold">XAI:</span> {inc.explanation}</p></li>))}</ul></div>
+            {isExpanded && canExpand && (
+                <div className="border-t border-gray-600/50 p-4 space-y-4 animate-fade-in-down">
+                    <StructuralDiagnostics report={structuralReport} />
+                    {inconsistencies.length > 0 ? (
+                        <div>
+                            <h5 className="font-semibold text-sm mb-2 text-gray-300">Inconsistências Encontradas:</h5>
+                            <ul className="space-y-3">
+                                {inconsistencies.map((inc, index) => (
+                                    <li key={index} className="text-xs border-l-2 border-yellow-500/50 pl-3">
+                                        <p className="font-semibold text-yellow-300">
+                                            {inc.message}{' '}
+                                            <span className="text-gray-500 font-mono">({inc.code})</span>
+                                        </p>
+                                        <p className="text-gray-400 mt-1">
+                                            <span className="font-semibold">XAI:</span> {inc.explanation}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : (
+                        structuralReport && (
+                            <p className="text-[11px] text-emerald-200">
+                                Nenhuma inconsistência fiscal detectada para este documento.
+                            </p>
+                        )
+                    )}
+                </div>
             )}
         </div>
     );

@@ -89,14 +89,14 @@ const App: React.FC = () => {
   }, [auditReport, dateFilter]);
   
   return (
-    <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
+    <div className="min-h-screen bg-[#050d1f] font-sans text-slate-100">
       <Header 
         onShowLogs={() => setShowLogs(true)} 
         onReset={resetApp} 
         isAnalysisComplete={isPipelineComplete && !isPipelineRunning}
       />
     
-      <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+      <main className="mx-auto max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
         {!isPipelineComplete && !pipelineError && (
           <div className="max-w-4xl mx-auto">
             {isPipelineRunning ? (
@@ -129,8 +129,8 @@ const App: React.FC = () => {
                 isReconciliationRunning={agentStates.reconciliation.status === 'running'}
                 isAIEnriching={isAIEnriching}
             />
-            <div className="pt-8 border-t border-gray-700/50">
-                <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Explore os Dados</h2>
+            <div className="border-t border-white/5 pt-10">
+                <h2 className="mb-4 text-center text-2xl font-semibold text-slate-100">Explore os Dados</h2>
                 <ChatPanel
                     messages={messages}
                     onSendMessage={handleSendMessage}

@@ -27,14 +27,14 @@ from sqlalchemy import delete
 get_settings.cache_clear()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def event_loop() -> AsyncGenerator[asyncio.AbstractEventLoop, None]:
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 async def prepare_database() -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

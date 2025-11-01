@@ -1,0 +1,4 @@
+# file: X:\PROJETO FINAL I2A2\of-projeto-final---nexus-quantumi2a2_-análise-fiscal-com-ia (2)\backend\app\core\config.py
+# hypothesis_version: 6.142.5
+
+[100, 1024, ',', '.env', '.env.local', '/api/v1', '0.1.0', 'INFO', 'Nexus Quantum I2A2', 'allow', 'app.db:migrations', 'before', 'cors_origins', 'csv', 'development', 'jpeg', 'jpg', 'pdf', 'png', 'storage/uploads', 'txt', 'utf-8', 'xlsx', 'xml']

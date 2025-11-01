@@ -1,7 +1,6 @@
 import { logger } from "./logger";
 import { Type, SchemaType } from "./geminiSchema";
 import { AIError, ApiError } from '../utils/errors';
-import { AiService } from './generatedApi';
 
 type ChatHistoryEntry = {
     role: 'user' | 'model';
@@ -41,6 +40,73 @@ const buildHistoryText = (history: ChatHistoryEntry[]) =>
         .filter(Boolean)
         .join('\n');
 
+const detectApiBaseUrl = (): string => {
+    const fromEnv = (import.meta.env?.VITE_API_BASE_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        return fromEnv.replace(/\/$/, '');
+    }
+    if (typeof window !== 'undefined' && window.location) {
+        return `${window.location.origin}/api/v1`;
+    }
+    return 'http://localhost:8080/api/v1';
+};
+
+const API_BASE_URL = detectApiBaseUrl();
+
+async function postJson<T>(path: string, body: unknown, init?: RequestInit): Promise<T> {
+    const headers = new Headers(init?.headers);
+    if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+    }
+
+    let response: Response;
+    let payloadText: string | null = null;
+
+    try {
+        response = await fetch(`${API_BASE_URL}${path}`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+            ...init,
+            headers,
+        });
+        payloadText = await response.text();
+    } catch (error) {
+        throw new AIError('Falha na comunicacao com o servico de IA.', error);
+    }
+
+    let parsed: any = null;
+    if (payloadText) {
+        try {
+            parsed = JSON.parse(payloadText);
+        } catch {
+            parsed = payloadText;
+        }
+    }
+
+    if (!response.ok) {
+        const detail = (() => {
+            if (!parsed) return response.statusText || 'Erro desconhecido.';
+            if (typeof parsed === 'string') return parsed;
+            const candidate = parsed.detail ?? parsed.message ?? parsed.error;
+            if (Array.isArray(candidate)) {
+                return candidate
+                    .map((item) =>
+                        typeof item === 'string'
+                            ? item
+                            : item?.msg ?? item?.message ?? JSON.stringify(item)
+                    )
+                    .join('; ');
+            }
+            if (typeof candidate === 'string') return candidate;
+            return response.statusText || 'Erro desconhecido.';
+        })();
+
+        throw new ApiError(detail || 'Falha ao chamar o backend de IA.', response.status, parsed);
+    }
+
+    return parsed as T;
+}
+
 export async function generateJSON<T = unknown>(
     model: string,
     prompt: string,
@@ -54,15 +120,11 @@ export async function generateJSON<T = unknown>(
         try {
             const composedPrompt = `${prompt}\n\nResponda apenas com um JSON valido que respeite o schema abaixo:\n${schemaDescription}`;
 
-            const response = await AiService.generateApiV1AiGeneratePost({
-                requestBody: {
-                    prompt: composedPrompt,
-                    model,
-                    temperature: 0.3,
-                }
+            const { text } = await postJson<{ text: string }>('/ai/generate', {
+                prompt: composedPrompt,
+                model,
+                temperature: 0.3,
             });
-
-            const text = (response as any).text;
 
             if (!text || !text.trim()) {
                 throw new AIError('Resposta vazia da IA.');
@@ -125,15 +187,11 @@ export function createChatSession(
                 'Retorne apenas um JSON valido que siga o schema.',
             ];
 
-            const response = await AiService.generateApiV1AiGeneratePost({
-                requestBody: {
-                    prompt: promptSections.join('\n'),
-                    model,
-                    temperature: 0.3,
-                }
+            const { text } = await postJson<{ text: string }>('/ai/generate', {
+                prompt: promptSections.join('\n'),
+                model,
+                temperature: 0.3,
             });
-
-            const text = (response as any).text;
 
             chatHistory.push({ role: 'model', parts: [{ text }] });
 

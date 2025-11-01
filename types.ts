@@ -23,7 +23,16 @@ export type AgentStates = Record<AgentName, AgentState>;
 
 // --- Document & Data Types ---
 
-export type DocumentKind = 'NFE_XML' | 'CSV' | 'XLSX' | 'PDF' | 'IMAGE' | 'UNSUPPORTED';
+export type DocumentKind =
+  | 'NFE_XML'
+  | 'CSV'
+  | 'XLSX'
+  | 'PDF'
+  | 'IMAGE'
+  | 'JSON'
+  | 'TXT'
+  | 'ZIP'
+  | 'UNSUPPORTED';
 
 export interface ImportedDoc {
   kind: DocumentKind;
@@ -35,6 +44,67 @@ export interface ImportedDoc {
   error?: string;
   raw: File;
   meta?: Record<string, any>;
+}
+
+export type StructuralQuality = 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR';
+
+export interface StructuralIssue {
+  code: string;
+  message: string;
+  severity: 'INFO' | 'WARN' | 'ERROR';
+  hint?: string;
+}
+
+export interface EncodingDiagnosis {
+  detected: string;
+  normalized: string;
+  confidence: number;
+  bomStripped: boolean;
+  attemptedEncodings: string[];
+}
+
+export interface FileStructuralSummary {
+  format: string;
+  mimeType?: string;
+  sizeInBytes: number;
+  checksum: string;
+  internalPath?: string;
+  parentArchive?: string;
+  encoding: EncodingDiagnosis;
+  delimiter?: string;
+  quoteChar?: string;
+  headersPresent?: boolean;
+  columnCount?: number;
+  columns?: string[];
+  rowCount?: number;
+  sampleRows?: Record<string, any>[];
+  language?: string;
+  locale?: string;
+  quality: StructuralQuality;
+  issues: StructuralIssue[];
+  metrics?: Record<string, number>;
+  processingLog: string[];
+  discardedFiles?: string[];
+  columnProfiles?: ColumnSemanticProfile[];
+}
+
+export interface ColumnSemanticProfile {
+  name: string;
+  semanticType: 'date' | 'datetime' | 'currency' | 'numeric' | 'categorical' | 'text' | 'identifier';
+  confidence: number;
+  nullPercentage: number;
+  uniqueValues: number;
+  sampleValues: (string | number | null)[];
+  outlierRate?: number;
+  duplicatesDetected?: boolean;
+  stats?: {
+    min?: number;
+    max?: number;
+    mean?: number;
+    median?: number;
+    stdDev?: number;
+  };
+  notes?: string[];
 }
 
 export interface AuditedDocument {

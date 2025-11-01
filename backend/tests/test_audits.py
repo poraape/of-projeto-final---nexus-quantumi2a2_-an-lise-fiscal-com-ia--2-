@@ -119,7 +119,7 @@ async def test_missing_files_returns_400(client: AsyncClient) -> None:
     assert response.status_code == 400
 
 
-schema = schemathesis.from_asgi("/api/v1/openapi.json", app)
+schema = schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)
 
 
 @schema.parametrize()

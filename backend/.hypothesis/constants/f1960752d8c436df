@@ -1,0 +1,4 @@
+# file: X:\PROJETO FINAL I2A2\of-projeto-final---nexus-quantumi2a2_-análise-fiscal-com-ia (2)\backend\app\services\audit.py
+# hypothesis_version: 6.142.5
+
+[1024, '.', 'GB', 'KB', 'MB', 'TB', 'arquivo-sem-nome', 'audit_job_created', 'audit_job_enqueued', 'audit_job_reused', 'audits.process', 'content_type', 'original_name', 'sha256', 'size', 'stored_name', 'stored_path', 'wb']
