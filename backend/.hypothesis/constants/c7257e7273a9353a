@@ -1,0 +1,4 @@
+# file: X:\PROJETO FINAL I2A2\of-projeto-final---nexus-quantumi2a2_-análise-fiscal-com-ia (2)\backend\app\services\csv_analyzer.py
+# hypothesis_version: 6.142.5
+
+[0.5, 100, 2048, ',', '.', 'CSVAnalysis', 'CSVAnalysisError', '[^0-9,.]', 'analyse_csv_file', 'analyse_csv_stream', 'as_py', 'auto', 'coerce', 'columns', 'csv_filename', 'csv_load_failed', 'delimiter', 'diagnostics', 'dtypes', 'encoding', 'error', 'ignore', 'latin-1', 'mean', 'median', 'non_nulls', 'nulls_pct', 'preview', 'price', 'pyarrow', 'python', 'rb', 'records', 'row_count', 'rows', 'stats', 'std', 'utf-8', 'utf-8-sig', 'valor', 'warn']

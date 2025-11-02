@@ -128,5 +128,4 @@ schema = schemathesis.openapi.from_asgi("/api/v1/openapi.json", app)
 def test_openapi_contract(case, captured_tasks):
     if case.method == "POST" and case.path == "/api/v1/audits":
         pytest.skip("Multipart body generation not yet supported in contract tests")
-    response = case.call_asgi()
-    case.validate_response(response)
+    case.call_and_validate()

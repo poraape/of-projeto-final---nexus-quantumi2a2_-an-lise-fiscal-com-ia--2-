@@ -105,52 +105,52 @@ def analyse_csv_stream(stream: BinaryIO, *, filename: str | None = None) -> CSVA
 
     # --- Corrected Numeric Conversion ---
     for col in df.columns:
+        if col.lower() == "product": # Explicitly skip 'product' column from numeric conversion
+            continue
+
         if pd.api.types.is_string_dtype(df[col]):
             series = df[col]
+            converted_series = pd.Series(dtype=float) # Initialize an empty float series
 
-            # Try direct conversion first
-            converted_series = pd.to_numeric(series, errors="coerce")
-
-            # If that fails for some values, try cleaning for pt-BR currency
-            failed_mask = converted_series.isnull()
-            if failed_mask.any():
-                # Apply cleaning only to the values that failed conversion
+            if col.lower() in ["valor", "price"]:
+                # Apply cleaning to the entire series for known currency columns
                 cleaned_series = (
-                    series[failed_mask]
+                    series
                     .str.replace(r"[^0-9,.]", "", regex=True)  # Remove non-numeric chars
                     .str.replace(".", "", regex=False)
                     .str.replace(",", ".", regex=False)
                 )
-                converted_cleaned = pd.to_numeric(cleaned_series, errors="coerce")
+                converted_series = pd.to_numeric(cleaned_series, errors="coerce")
+            else:
+                # For other string columns, try direct numeric conversion
+                converted_series = pd.to_numeric(series, errors="coerce")
 
-                # Update the original converted series with the newly converted values
-                converted_series[failed_mask] = converted_cleaned
-
-            # If any conversion resulted in at least one number, update the column
+            # Only update the column if it contains at least one valid number
             if not converted_series.isnull().all():
-                df[col] = converted_series
+                df[col] = converted_series.astype(float)
 
     logger.info(f"Dtypes after numeric conversion: {df.dtypes.to_dict()}", extra={"csv_filename": filename})
 
     # --- Refactored Statistical Calculations ---
-    stats = {
-        "mean": df.mean(numeric_only=True).to_dict(),
-        "median": df.median(numeric_only=True).to_dict(),
-        "std": df.std(numeric_only=True).to_dict(),
-        "nulls_pct": df.isnull().mean().mul(100).round(2).to_dict(),
-        "non_nulls": df.notnull().sum().to_dict()
-    }
-
-    # --- Build Final Analysis Dictionary ---
     column_stats: dict[str, ColumnStats] = {}
     for column in df.columns.astype(str):
-        column_stats[column] = {
-            "mean": stats["mean"].get(column),
-            "median": stats["median"].get(column),
-            "std": stats["std"].get(column),
-            "nulls_pct": stats["nulls_pct"].get(column),
-            "non_nulls": int(stats["non_nulls"].get(column)) if pd.notna(stats["non_nulls"].get(column)) else None,
-        }
+        series = df[column]
+        stats_for_column: ColumnStats = {}
+
+        # Calculate nulls_pct and non_nulls for all columns
+        stats_for_column["nulls_pct"] = series.isnull().mean() * 100
+        stats_for_column["non_nulls"] = series.count()
+
+        if pd.api.types.is_numeric_dtype(series):
+            stats_for_column["mean"] = series.mean()
+            stats_for_column["median"] = series.median()
+            stats_for_column["std"] = series.std()
+        else:
+            stats_for_column["mean"] = None
+            stats_for_column["median"] = None
+            stats_for_column["std"] = None
+
+        column_stats[column] = stats_for_column
 
     preview = df.head(3).to_dict(orient="records")
     # Convert pyarrow types in preview to standard python types for JSON serialization

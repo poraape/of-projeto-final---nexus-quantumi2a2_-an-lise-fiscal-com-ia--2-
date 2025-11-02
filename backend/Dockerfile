@@ -23,7 +23,11 @@ WORKDIR /app
 RUN addgroup --system nexus && adduser --system --ingroup nexus nexus
 
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && pip install --no-cache-dir /wheels/* \
+    && apt-get remove -y build-essential libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
