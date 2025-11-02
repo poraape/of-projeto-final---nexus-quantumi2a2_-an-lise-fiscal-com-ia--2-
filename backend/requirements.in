@@ -1,0 +1,24 @@
+# -- Web & API --
+fastapi
+uvicorn[standard]
+gunicorn
+pydantic
+pydantic-settings
+python-multipart  # Para uploads de arquivo
+python-jose[cryptography] # Para JWT
+
+# -- Processamento Assíncrono --
+celery
+redis
+
+# -- Dados & Persistência --
+sqlalchemy
+alembic
+psycopg2-binary # Driver do PostgreSQL
+pandas # Para manipulação de dados (substitui PapaParse)
+lxml # Para parsing de XML
+
+# -- Observabilidade & SDKs --
+opentelemetry-distro
+google-generativeai
+google-cloud-secret-manager

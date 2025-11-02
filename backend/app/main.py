@@ -1,61 +1,33 @@
-# SPDX-License-Identifier: MIT
-"""
-Application bootstrap for the backend service.
-
-This module is intentionally lightweight in this stage; routes and
-extensions are plugged in from dedicated packages so we can evolve
-the architecture without rewriting the entrypoint.
-"""
-
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.cors import CORSMiddleware
 
-from .api import api_router
-from .core.config import get_settings
-from .core.logging import configure_logging
+from app.api.v1.endpoints import ai
+from app.config import settings
 
+app = FastAPI(
+    title="Nexus QuantumI2A2 API",
+    description="Backend services for the Nexus QuantumI2A2 fiscal analysis platform.",
+    version="1.0.0",
+    # Desativa a documentação em produção, conforme a variável de ambiente
+    docs_url="/api/docs" if settings.ENABLE_DOCS else None,
+    redoc_url="/api/redoc" if settings.ENABLE_DOCS else None,
+)
 
-def create_app() -> FastAPI:
-    """
-    Instantiate a FastAPI application with the project defaults.
+# Configuração de CORS (Cross-Origin Resource Sharing)
+# Permite que o frontend (em outro domínio/porta) acesse a API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Em produção, restrinja para o domínio do seu frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    Returns
-    -------
-    FastAPI
-        Application ready to receive routers and event handlers.
-    """
-    settings = get_settings()
-    configure_logging()
-
-    app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
-        docs_url=f"{settings.api_v1_prefix}/docs" if settings.enable_docs else None,
-        redoc_url=f"{settings.api_v1_prefix}/redoc" if settings.enable_docs else None,
-        openapi_url=f"{settings.api_v1_prefix}/openapi.json"
-        if settings.enable_docs
-        else None,
-    )
-
-    if settings.enable_cors and settings.cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=settings.cors_origins,
-            allow_methods=["*"],
-            allow_headers=["*"],
-            allow_credentials=True,
-        )
-
-    app.include_router(api_router, prefix=settings.api_v1_prefix)
-
-    @app.get("/health", include_in_schema=False)
-    async def root_health() -> dict:
-        """
-        Backward compatible health endpoint.
-        """
-        return {"status": "ok"}
-
-    return app
+# Inclui os routers da API
+app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI Services"])
 
 
-app = create_app()
+@app.get("/api/v1/health/live", tags=["Health"])
+def health_check():
+    """Verifica se a API está online."""
+    return {"status": "ok"}

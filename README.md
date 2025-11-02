@@ -85,10 +85,9 @@ A conteinerização implementada é o primeiro passo para uma arquitetura de mic
 1.  **Clone o repositório.**
 2.  **Configure as Variáveis de Ambiente:**
     ```sh
-    # .env
-    VITE_GOOGLE_API_KEY=SUA_CHAVE_DE_API_AQUI
+    # .env (a chave de API do Google não é mais necessária no frontend)
     VITE_API_BASE_URL=http://localhost:8000/api/v1
-    # Opcional: habilita o pipeline antigo em Web Worker
+    # Opcional: habilita o pipeline legado em Web Worker
     VITE_USE_LEGACY_WORKER=false
     ```
 3.  **Inicie o Servidor de Desenvolvimento:**

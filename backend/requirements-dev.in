@@ -1,0 +1,7 @@
+-r requirements.in
+
+# -- Testes --
+pytest
+pytest-cov
+httpx # Para testar clientes HTTP/APIs
+schemathesis # Testes de contrato baseados em OpenAPI
